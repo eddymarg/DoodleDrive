@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Doodle: Hybrid Drive</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap');
+
+        :root {
+            --grass-polished: #91cf60;
+            --road-polished: #4a4a4a;
+            --line-polished: #ffffff;
+            --google-blue: #4285f4;
+            --google-red: #ea4335;
+            --google-yellow: #fbbc05;
+            --google-green: #34a853;
+        }
+
+        body {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0;
+            background-color: #fdfdfd; 
+            font-family: 'Gaegu', cursive;
+            overflow: hidden;
+        }
+
+        #doodle-stage {
+            position: relative; width: 800px; height: 400px;
+            background-color: var(--grass-polished);
+            border: 4px solid #3c4043;
+            border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+            overflow: hidden;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.1);
+        }
+
+        /* --- MODAL STYLE --- */
+        #lucky-modal-overlay {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 4000; display: none; /* Hidden by default */
+            align-items: center; justify-content: center;
+        }
+
+        #lucky-modal {
+            background: white; border: 4px solid #333;
+            padding: 30px; width: 350px; text-align: center;
+            border-radius: 15px 50px 20px 45px;
+            box-shadow: 10px 10px 0px #333;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .close-modal {
+            margin-top: 20px; background: var(--google-green);
+            color: white; border: 2px solid #333;
+            padding: 5px 20px; border-radius: 10px;
+            cursor: pointer; font-family: 'Gaegu', cursive; font-size: 18px;
+        }
+
+        /* --- SNACKBAR / PROMPT --- */
+        #scroll-prompt {
+            position: absolute; bottom: -60px; left: 50%;
+            transform: translateX(-50%); background: #323639;
+            color: white; padding: 8px 20px; border-radius: 30px;
+            font-size: 18px; display: flex; align-items: center;
+            gap: 10px; z-index: 2500;
+            transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #scroll-prompt.show { bottom: 20px; }
+        
+        .arrow-bounce { animation: bounce 1s infinite; display: inline-block; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+
+        /* --- OVERLAYS --- */
+        #dashboard-overlay {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; background: #f8f9fa;
+            z-index: 3000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: transform 0.6s ease-in-out; border-bottom: 4px solid #333;
+        }
+
+        .sketch-wheel {
+            width: 140px; height: 140px; border: 6px solid #333;
+            border-radius: 48% 52% 50% 50% / 50% 48% 52% 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px; background: white; position: relative;
+        }
+        .sketch-wheel::after { content: ''; position: absolute; width: 100%; height: 6px; background: #333; }
+
+        .ignition-btn {
+            background: var(--google-red); color: white; border: 3px solid #333;
+            padding: 10px 25px; font-size: 24px; border-radius: 10px 30px 15px 40px;
+            cursor: pointer; font-family: 'Gaegu', cursive;
+        }
+
+        /* --- HUD --- */
+        #hud-speedo {
+            position: absolute; top: 15px; right: 25px;
+            width: 65px; height: 65px; background: white;
+            border: 3px solid #333; border-radius: 50% 45% 52% 48%;
+            z-index: 2000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        #needle-main {
+            position: absolute; width: 3px; height: 22px; background: #333;
+            bottom: 50%; transform-origin: bottom center; transform: rotate(-90deg);
+        }
+
+        /* --- WORLD --- */
+        #world-container { width: 100%; height: 100%; overflow-y: scroll; position: relative; z-index: 10; scrollbar-width: none; }
+        #world-container::-webkit-scrollbar { display: none; }
+        #scroll-buffer { height: 8000px; width: 100%; }
+        #moving-content { position: absolute; top: 0; left: 0; width: 100%; height: 8000px; pointer-events: none; }
+        
+        #road-svg { width: 100%; height: 100%; fill: none; }
+        .road-base { stroke: var(--road-polished); stroke-width: 90; stroke-linecap: round; }
+        .road-lines { stroke: var(--line-polished); stroke-width: 4; stroke-dasharray: 20, 30; }
+
+        #car { 
+            position: absolute; width: 45px; height: 80px; z-index: 1000; 
+            transform-origin: center center;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 100'%3E%3Crect x='5' y='5' width='50' height='90' rx='15' fill='%23ea4335'/%3E%3Cpath d='M10 30 Q 30 20, 50 30 L 45 45 Q 30 40, 15 45 Z' fill='%23e1f5fe'/%3E%3Ccircle cx='15' y='12' r='4' fill='white'/%3E%3Ccircle cx='45' y='12' r='4' fill='white'/%3E%3C/svg%3E");
+            background-size: contain; background-repeat: no-repeat;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2));
+        }
+
+        .info-box { 
+            position: absolute; background: white; padding: 10px; 
+            border: 3px solid #333; border-radius: 15px 5px 15px 5px;
+            width: 160px; font-size: 18px; line-height: 1.1;
+            z-index: 500; transform: scale(0); transition: transform 0.3s;
+        }
+        .info-box.active { transform: scale(1) rotate(2deg); }
+
+        /* --- FOOTER --- */
+        .google-footer { margin-top: 30px; display: flex; flex-direction: column; align-items: center; }
+        .search-bar {
+            width: 500px; height: 40px; border: 1px solid #dfe1e5;
+            border-radius: 24px; display: flex; align-items: center;
+            padding: 0 15px; font-size: 16px; color: #333; font-family: Arial, sans-serif;
+        }
+        .footer-btns button {
+            padding: 8px 16px; background: #f8f9fa; border: 1px solid #f8f9fa;
+            border-radius: 4px; margin: 15px 5px; cursor: pointer; color: #3c4043;
+            font-family: Arial, sans-serif; font-size: 14px;
+        }
+        .footer-btns button:hover { border: 1px solid #dadce0; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div id="doodle-stage">
+        <div id="lucky-modal-overlay">
+            <div id="lucky-modal">
+                <h2 style="color: var(--google-blue); margin-top: 0;">You're in luck! 🍀</h2>
+                <p style="font-size: 22px;">Results show that hiring me leads to <b>100% more</b> boundary breaking creativeness met with cutting edge technology.</p>
+                <button class="close-modal" onclick="toggleModal(false)">Back to the Road</button>
+            </div>
+        </div>
+
+        <div id="scroll-prompt">
+            <span>Scroll down to drive</span>
+            <span class="arrow-bounce">↓</span>
+        </div>
+
+        <div id="dashboard-overlay">
+            <h1 style="margin: 0; font-size: 40px; color: var(--google-blue);">Doodle Drive!</h1>
+            <div class="sketch-wheel"><div style="font-family: Arial; font-weight: bold;">G</div></div>
+            <button class="ignition-btn" onclick="ignite()">Ignition! 🔑</button>
+        </div>
+
+        <div id="hud-speedo">
+            <div id="needle-main"></div>
+            <div id="speed-txt" style="font-size: 20px; margin-top:10px; font-weight:bold;">0</div>
+        </div>
+
+        <div id="moving-content">
+            <svg id="road-svg" viewBox="0 0 800 8000" preserveAspectRatio="none">
+                <path id="master-path" d="M400,0 C 700,800 100,1600 400,2400 S 700,4000 400,4800 S 100,6400 400,8000" />
+                <use href="#master-path" class="road-base" />
+                <use href="#master-path" class="road-lines" />
+            </svg>
+            <div style="position: absolute; top: 400px; left: 100px; font-size: 40px;">☁️</div>
+            <div style="position: absolute; top: 1800px; left: 650px; font-size: 40px;">🌲</div>
+            
+            <div id="info-1" class="info-box" style="top: 1200px; left: 520px;"><b>The Full-Stack Pilot</b><br>I build everything from front-end pixels to back-end logic!</div>
+            <div id="info-2" class="info-box" style="top: 3200px; left: 80px;"><b>UI Enthusiast</b><br>I love making websites feel like interactive toys.</div>
+            <div id="info-3" class="info-box" style="top: 5200px; left: 550px;"><b>Problem Solver</b><br>Complex roadmaps and messy code don't scare me!</div>
+            <div id="info-4" class="info-box" style="top: 7200px; left: 120px;"><b>Open for Hire</b><br>I'm looking for my next big adventure. Let's work together!</div>
+        </div>
+
+        <div id="car"></div>
+        <div id="world-container"><div id="scroll-buffer"></div></div>
+    </div>
+
+    <div class="google-footer">
+        <div class="search-bar">🔍 &nbsp; Searching for a creative developer...</div>
+        <div class="footer-btns">
+            <button>Google Search</button>
+            <button onclick="toggleModal(true)">I'm Feeling Lucky</button>
+        </div>
+    </div>
+
+    <script>
+        const world = document.getElementById('world-container');
+        const movingContent = document.getElementById('moving-content');
+        const path = document.getElementById('master-path');
+        const car = document.getElementById('car');
+        const needle = document.getElementById('needle-main');
+        const speedTxt = document.getElementById('speed-txt');
+        const prompt = document.getElementById('scroll-prompt');
+        const modal = document.getElementById('lucky-modal-overlay');
+        const infoBoxes = document.querySelectorAll('.info-box');
+        const pathLength = path.getTotalLength();
+        
+        let lastScroll = 0;
+        const VIEW_CENTER_Y = 200;
+
+        function ignite() {
+            document.getElementById('dashboard-overlay').style.transform = "translateY(-100%)";
+            prompt.classList.add('show');
+        }
+
+        function toggleModal(show) {
+            modal.style.display = show ? 'flex' : 'none';
+        }
+
+        world.addEventListener('scroll', () => {
+            if (world.scrollTop > 10) prompt.classList.remove('show');
+
+            const currentScroll = world.scrollTop;
+            const scrollMax = world.scrollHeight - world.clientHeight;
+            const scrollPercent = currentScroll / scrollMax;
+
+            const dist = scrollPercent * pathLength;
+            const point = path.getPointAtLength(dist);
+            const nextPoint = path.getPointAtLength(Math.min(pathLength, dist + 2));
+
+            movingContent.style.transform = `translateY(${VIEW_CENTER_Y - point.y}px)`;
+            car.style.left = `${point.x}px`;
+            car.style.top = `${VIEW_CENTER_Y}px`;
+
+            const angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x);
+            car.style.transform = `translate(-50%, -50%) rotate(${(angle * 180 / Math.PI) + 90}deg)`;
+
+            infoBoxes.forEach(box => {
+                const boxTop = parseInt(box.style.top);
+                const relativeY = (boxTop - point.y) + VIEW_CENTER_Y;
+                if (relativeY > 50 && relativeY < 350) box.classList.add('active');
+                else box.classList.remove('active');
+            });
+
+            const speed = Math.min(Math.abs(currentScroll - lastScroll) * 3, 100);
+            speedTxt.innerText = Math.floor(speed);
+            needle.style.transform = `rotate(${speed - 90}deg)`;
+            lastScroll = currentScroll;
+        });
+
+        window.onload = () => {
+            const p = path.getPointAtLength(0);
+            car.style.left = `${p.x}px`;
+            car.style.top = `${VIEW_CENTER_Y}px`;
+        }
+    </script>
+</body>
+</html>
